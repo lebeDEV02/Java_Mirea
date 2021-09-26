@@ -1,3 +1,5 @@
+package com.company;
+
 import java.lang.*;
 public class Dog {
     private String name;

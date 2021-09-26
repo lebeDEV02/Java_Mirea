@@ -1,3 +1,5 @@
+package com.company;
+
 import java.lang.*;
 public class testDog {
     public static void main (String[] args) {
