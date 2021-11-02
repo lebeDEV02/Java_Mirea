@@ -1,4 +1,4 @@
-package collection;
+package drunkard;
 
 import java.util.*;
 
