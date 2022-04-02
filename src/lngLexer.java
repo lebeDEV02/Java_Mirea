@@ -4,13 +4,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class lngLexer {
-    public static void main(String args[]){
+    public static void main(String args[]) throws ParsingException{
         RegularExpressions regExpEntity = new RegularExpressions();
         LinkedList<Token> listOfTokens = new LinkedList<Token>();
 
         Scanner scanner = new Scanner(System.in);
 
         String expression = scanner.nextLine();
+
         String firstString = "";
 
         for (int i = 0; i<expression.length(); i++){
@@ -34,6 +35,8 @@ public class lngLexer {
             }
         }
         printListOfTokens(listOfTokens);
+        Parser par = new Parser(listOfTokens, expression.length());
+        par.lang();
     }
     public static void printListOfTokens(LinkedList<Token> listOfTokens){
         for (Token token : listOfTokens) {
