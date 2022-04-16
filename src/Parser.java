@@ -1,245 +1,145 @@
 import java.util.LinkedList;
 
 public class Parser {
-    int iterator = 0;
-    int amountOfExceptions = 0;
-    int messagesToConsole = 0;
-    public LinkedList<Token> tokens = new LinkedList<Token>();
-    public int lengthOfExpression;
-    Parser(LinkedList<Token> tokens, int lengthOfExpression) {
+    LinkedList<Token> tokens;
+    int pos=0;
+
+    public Parser(LinkedList<Token> tokens) {
         this.tokens = tokens;
-        this.lengthOfExpression = lengthOfExpression;
     }
-
-    public void lang() throws ParsingException {
-        for (int i = 0; i < lengthOfExpression; i++ ){
-            if(iterator < tokens.size()) {
-                expr_();
-            } else if(iterator == tokens.size() && messagesToConsole == 0){
-                if(amountOfExceptions == 0){
-                    System.out.println("Parser check has passed successfully!!!");
-                } else{
-                    System.out.println("Found " + amountOfExceptions + " errors, fix them in order to continue ");
+    public Token receive(String[] need){
+        Token curToken;
+        if (pos<tokens.size()) {
+            curToken = tokens.get(pos);
+            for (String tokenTypeName : need)
+                if (tokenTypeName.equals(curToken.type.typeName)) {
+                    pos++;
+                    return curToken;
                 }
-                messagesToConsole += 1;
-            }
+        }
+        return null;
+    }
+    public void need(String[] expected){
+        Token token= receive(expected);
+        if(token==null){
+            throw new Error("На позииции "+pos+" ожидается "+expected[0]);
         }
     }
-    public void expr_() throws ParsingException {
-        Token currentToken = tokens.get(iterator);
-        if (currentToken.type == "WHILE"){
-            while_do(currentToken);
-            currentToken = tokens.get(iterator);
+    public Node parseVarNum(){
+        if (tokens.get(pos).type.typeName.equals("NUM")){
+            pos++;
+            return new NumberNode(tokens.get(pos-1));
         }
-        if (currentToken.type == "IF"){
-            try {
-                IF(currentToken);
-            }
-            catch (ParsingException ex){
-                ex.printErrorMessage(ex.token, ex.expected);
-                amountOfExceptions += 1;
-            }
-            iterator++;
-            currentToken = tokens.get(iterator);
-            try{
-                LB(currentToken);
-            }
-            catch (ParsingException ex){
-                ex.printErrorMessage(ex.token, ex.expected);
-                amountOfExceptions += 1;
-            }
-            iterator++;
-            currentToken = tokens.get(iterator);
-            condition(currentToken);
-            currentToken = tokens.get(iterator);
-            try{
-                RB(currentToken);
-            }
-            catch (ParsingException ex){
-                ex.printErrorMessage(ex.token, ex.expected);
-                amountOfExceptions += 1;
-            }
-            iterator++;
-            currentToken = tokens.get(iterator);
+        if (tokens.get(pos).type.typeName.equals("VAR")){
+            pos++;
+            return new VarNode(tokens.get(pos-1));
         }
-        try {
-            var__(currentToken);
-        }
-        catch (ParsingException ex){
-            ex.printErrorMessage(currentToken, "VAR");
-            amountOfExceptions += 1;
-        }
-        iterator++;
-        currentToken = tokens.get(iterator);
-        try{
-            assign_op(currentToken);
-        }
-        catch (ParsingException ex){
-            ex.printErrorMessage(ex.token, ex.expected);
-            amountOfExceptions += 1;
-        }
-        iterator++;
-        currentToken = tokens.get(iterator);
-        while ((currentToken.type != "SEMICOLON") & (currentToken.type != "R_BRACKET") & (currentToken.type != "L_BRACKET") & (currentToken.type != "WHILE")){
-            expr_val(currentToken);
-            iterator++;
-            currentToken = tokens.get(iterator);
-        }
-        if (currentToken.type == "WHILE"){
-            try {
-                WHILE(currentToken);
-            }
-            catch(ParsingException ex){
-                ex.printErrorMessage(ex.token, ex.expected);
-                amountOfExceptions += 1;
-            }
-            iterator++;
-            currentToken = tokens.get(iterator);
-            if (currentToken.type == "L_BRACKET"){
-                try{
-                    LB(currentToken);
-                }
-                catch (ParsingException ex){
-                    ex.printErrorMessage(ex.token, ex.expected);
-                    amountOfExceptions += 1;
-                }
-                iterator++;
-                currentToken = tokens.get(iterator);
-                condition(currentToken);
-                currentToken = tokens.get(iterator);
-                try{
-                    RB(currentToken);
-                }
-                catch (ParsingException ex){
-                    ex.printErrorMessage(ex.token, ex.expected);
-                    amountOfExceptions += 1;
-                }
-                iterator++;
-            }
-        }
-        try{
-            currentToken = tokens.get(iterator);
-            SEMICOLON(currentToken);
-        }
-        catch (ParsingException ex){
-            ex.printErrorMessage(ex.token, ex.expected);
-            amountOfExceptions += 1;
-        }
-        iterator++;
+        throw new Error("Ожидается переменная или число на позиции: "+pos);
     }
-
-    public void IF(Token currentToken) throws ParsingException {
-        if (currentToken.type != "IF")
-            throw new ParsingException(currentToken, "IF");
+    public Node parsePar(){
+        if (tokens.get(pos).type.typeName.equals("LPAR")){
+            pos++;
+            Node node = parseFormula();
+            need(new String[]{"RPAR"});
+            return node;
+        }
+        else
+            return parseVarNum();
     }
-
-    public void var__(Token currentToken) throws ParsingException {
-        if (currentToken.type != "VAR")
-            throw new ParsingException(currentToken, "VAR");
+    public Node parseMultDiv(){
+        Node leftVal= parsePar();
+        Token operator= receive(new String[]{"MULT","DIV"});
+        while (operator!=null){
+            Node rightVal= parsePar();
+            leftVal=new BinOpNode(operator,leftVal,rightVal);
+            operator= receive(new String[]{"MULT","DIV"});
+        }
+        return leftVal;
     }
-    public void assign_op(Token currentToken) throws ParsingException {
-        if (currentToken.type != "ASSIGN_OP")
+    public Node parseFormula(){
+        Node leftVal= parseMultDiv();
+        Token operator= receive(new String[]{"PLUS","MINUS"});
+        while (operator!=null){
+            Node rightVal= parseMultDiv();
+            leftVal=new BinOpNode(operator,leftVal,rightVal);
+            operator= receive(new String[]{"PLUS","MINUS"});
+        }
+        return leftVal;
+    }
+    public Node parseString(){
+        if (tokens.get(pos).type.typeName.equals("VAR")) {
+            Node varNode = parseVarNum();
+            Token assign = receive(new String[]{"ASSIGN"});
+            if (assign != null) {
+                Node rightVal = parseFormula();
+                return new BinOpNode(assign, varNode, rightVal);
+            }
+            throw new Error("После переменной ожидается = на позиции:"+pos);
+        }
+        else if (tokens.get(pos).type.typeName.equals("PRINT")){
+            pos++;
+            return new UnOpNode(tokens.get(pos-1), this.parseFormula());
+        }
+        else if(tokens.get(pos).type.typeName.equals("WHILE")){
+            pos++;
+            return  parseWhile();
+        }
+        else if(tokens.get(pos).type.typeName.equals("FOR"))
         {
-            throw new ParsingException(currentToken, "ASSIGN_OP");
+            pos++;
+            return parseFor();
         }
+        throw new Error("Ошибка на позиции: "+pos+". Ожидалось действие или переменная");
     }
-    public void expr_val(Token currentToken) throws ParsingException {
-        if ((currentToken.type == "VAR") | (currentToken.type == "INT"))
-            value(currentToken);
-        else
-            try {
-                OP_VALUE(currentToken);
-            }
-            catch(ParsingException ex){
-                ex.printErrorMessage(ex.token, ex.expected);
-                amountOfExceptions += 1;
-            }
+    public Node parseFor(){
+        Node leftVal=parseFormula();
+        Token operator=receive(new String[]{"LESS","MORE","EQUAL"});
+        Node rightVal=parseFormula();
 
-    }
-    public void value(Token currentToken) throws ParsingException {
-        if (currentToken.type == "VAR")
-            var__(currentToken);
-        else
-            try{
-                digit__(currentToken);
-            }
-            catch (ParsingException ex){
-                ex.printErrorMessage(ex.token, ex.expected);
-                amountOfExceptions += 1;
-            }
-    }
-    public void digit__(Token currentToken) throws ParsingException{
-        if (currentToken.type != "INT")
-            throw new ParsingException(currentToken, "INT");
-    }
-    public void OP_VALUE(Token currentToken) throws ParsingException{
-        if (currentToken.type != "OPERATORS_LIST")
-            throw new ParsingException(currentToken, "OPERATORS_LIST");
-    }
-    public void while_do(Token currentToken) throws ParsingException {
-        WHILE(currentToken);
-        iterator++;
-        currentToken = tokens.get(iterator);
-        try{
-            LB(currentToken);
+        need(new String[]{"END"});
+
+        Node varNode = parseVarNum();
+        Token assign = receive(new String[]{"ASSIGN"});
+        Node rightActVal = parseFormula();
+        BinOpNode action= new BinOpNode(assign, varNode, rightActVal);
+        if (assign == null)
+            throw new Error("После переменной ожидается = на позиции:"+pos);
+        ForNode forNode= new ForNode(operator,leftVal,rightVal,action);
+        need(new String[]{"LRectPar"});
+        while(!tokens.get(pos).type.typeName.equals("RRectPAR")) {
+            forNode.addOperations(getOperations());
+            if (pos==tokens.size())
+                throw new Error("Ошибка, ожидалось }");
         }
-        catch (ParsingException ex){
-            ex.printErrorMessage(ex.token, ex.expected);
-            amountOfExceptions += 1;
-        }
-        iterator++;
-        currentToken = tokens.get(iterator);
-        condition(currentToken);
-        currentToken = tokens.get(iterator);
-        try {
-            RB(currentToken);
-        }
-        catch (ParsingException ex){
-            ex.printErrorMessage(ex.token, ex.expected);
-            amountOfExceptions += 1;
-        }
-        iterator++;
+        pos++;
+        return forNode;
     }
-    public void LB(Token currentToken) throws ParsingException {
-        if (currentToken.type != "L_BRACKET")
-            throw new ParsingException(currentToken, "L_BRACKET");
-    }
-    public void RB(Token currentToken) throws ParsingException{
-        if (currentToken.type != "R_BRACKET")
-            throw new ParsingException(currentToken, "R_BRACKET");
-    }
-    public void condition(Token currentToken) throws ParsingException {
-        try {
-            var__(currentToken);
+    public Node parseWhile(){
+        Node leftVal=parseFormula();
+        Token operator=receive(new String[]{"LESS","MORE","EQUAL"});
+        Node rightVal=parseFormula();
+        WhileNode whileNode=new WhileNode(operator,leftVal,rightVal);
+        need(new String[]{"LRectPar"});
+        while(!tokens.get(pos).type.typeName.equals("RRectPAR")) {
+            whileNode.addOperations(getOperations());
+            if (pos==tokens.size())
+                throw new Error("Ошибка, ожидалось }");
         }
-        catch (ParsingException ex){
-            ex.printErrorMessage(ex.token, ex.expected);
-            amountOfExceptions += 1;
-        }
-        iterator++;
-        currentToken = tokens.get(iterator);
-        try {
-            COMPARISON_OP(currentToken);
-        }
-        catch (ParsingException ex){
-            ex.printErrorMessage(ex.token, ex.expected);
-            amountOfExceptions += 1;
-        }
-        iterator++;
-        currentToken = tokens.get(iterator);
-        expr_val(currentToken);
-        iterator++;
+        pos++;
+        return whileNode;
     }
-    public void COMPARISON_OP (Token currentToken) throws ParsingException{
-        if (currentToken.type != "COMPARISON_OPERATORS")
-            throw new ParsingException(currentToken, "COMPARISON_OPERATORS");
+    public Node getOperations(){
+        Node codeStringNode=parseString();
+        need(new String[]{"END"});
+        return codeStringNode;
     }
-    public void WHILE(Token currentToken) throws ParsingException{
-        if (currentToken.type != "WHILE")
-            throw new ParsingException(currentToken, "WHILE");
-    }
-    public void SEMICOLON(Token currentToken) throws ParsingException{
-        if (currentToken.type != "SEMICOLON")
-            throw new ParsingException(currentToken, "SEMICOLON");
+    public RootNode parseTokens(){
+        RootNode root=new RootNode();
+        while (pos<tokens.size()){
+            Node codeStringNode= parseString();
+            need(new String[]{"END"});
+            root.addNode(codeStringNode);
+        }
+        return root;
     }
 }
