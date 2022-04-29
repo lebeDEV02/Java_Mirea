@@ -3,45 +3,39 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Lexer {
-    String userInput;
-    LinkedList<Token> listOfTokens = new LinkedList<>();
+    String code;
+    int currentPosition = 0;
+    LinkedList<Token> tokenList = new LinkedList<>();
 
-    public Lexer(String userInput){
-        this.userInput = userInput;
+    public Lexer(String code) {
+        this.code = code;
+    }
+    public LinkedList<Token> analyse() {
+        while (nextToken()) {}
+        for (Token token : tokenList)
+            if (!(token.type.name.equals("SEMICOLON")))
+                System.out.println("Token: " + token.type.name + ", value: ");
+        return this.tokenList;
     }
 
-    public void doLexicalAnalysis(){
-        TokensList regExpEntity = new TokensList();
-
-        String firstString = "";
-
-        for (int i = 0; i<userInput.length(); i++){
-            if(userInput.toCharArray()[i] == ' '){
-                continue;
-            } else{
-                firstString += userInput.toCharArray()[i];
-                String secondString = " ";
-                if (i < userInput.length() - 1) {
-                    secondString = firstString + userInput.toCharArray()[i + 1];
-                }
-                for (String key : regExpEntity.lexemsList.keySet()) {
-                    Pattern p = Pattern.compile(regExpEntity.lexemsList.get(key));
-                    Matcher m_1 = p.matcher(firstString);
-                    Matcher m_2 = p.matcher(secondString);
-                    if (m_1.find() && !m_2.find()) {
-                        listOfTokens.add(new Token(key, firstString));
-                        firstString = "";
-                    }
-                }
+    public boolean nextToken() {
+        TokenType[] allTokenTypes = TokenType.tokenTypeList;
+        if (this.currentPosition >= code.length()) {
+            return false;
+        }
+        for (int i = 0; i < allTokenTypes.length; i++) {
+            TokenType tokenType = allTokenTypes[i];
+            String regex = tokenType.pattern;
+            Matcher matcher = Pattern.compile(regex).matcher(code);
+            if (matcher.find(this.currentPosition) && matcher.start() == this.currentPosition) {
+                String result = this.code.substring(this.currentPosition, this.currentPosition + matcher.group().length());
+                Token token = new Token(tokenType, result);
+                this.currentPosition += result.length();
+                if (token.text.indexOf(' ') != 0)
+                    tokenList.add(token);
+                return true;
             }
         }
+        throw new Error("Ошибка на позиции: " + this.currentPosition);
     }
-    public LinkedList<Token> printListOfTokens(){
-        doLexicalAnalysis();
-        for (Token token : listOfTokens) {
-            System.out.println("Type of Regular Exp.: "+token.type + "; Token: " + token.value);
-        }
-        return this.listOfTokens;
-    }
-
 }

@@ -1,8 +1,9 @@
 public class Token {
-    String type;
-    String value;
-    Token(String Type, String Value){
-        value = Value;
-        type = Type;
+    TokenType type;
+    String text;
+
+    public Token(TokenType type, String text) {
+        this.type = type;
+        this.text = text;
     }
 }
